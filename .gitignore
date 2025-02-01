@@ -8,6 +8,7 @@ data
 history*.json
 runs
 deprecated/
+api_key.txt
 
 结果*.txt
 查看投票结果*

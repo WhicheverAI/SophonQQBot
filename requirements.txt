@@ -1,3 +1,4 @@
+openai
 anyio==3.7.1
 arrow==1.3.0
 binaryornot==0.4.4

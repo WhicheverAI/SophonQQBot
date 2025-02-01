@@ -1,17 +1,20 @@
 from nonebot import get_driver
 from nonebot.plugin import PluginMetadata
 
-from .config import Config
+from .config import SophonConfig
 
 __plugin_meta__ = PluginMetadata(
     name="sophon",
     description="",
     usage="",
-    config=Config,
+    config=SophonConfig,
 )
 
 global_config = get_driver().config
-config = Config.parse_obj(global_config)
+
+from nonebot import get_plugin_config
+config = get_plugin_config(SophonConfig)
+# config = SophonConfig.parse_obj(global_config)
 
 from nonebot import on_command, on_message
 # CommandSession, message_preprocessor  # 导入必要的模块
@@ -20,7 +23,7 @@ from nonebot.exception import MatcherException
 from nonebot.adapters import Message
 from nonebot.params import CommandArg
 from nonebot.adapters import Event
-from nonebot.adapters.onebot.v11 import PrivateMessageEvent, GroupMessageEvent
+from nonebot.adapters.onebot.v11 import PrivateMessageEvent, GroupMessageEvent, MessageSegment  # 新增MessageSegment导入
 from nonebot.rule import to_me
 from nonebot import logger
 import random
@@ -47,11 +50,11 @@ talker = on_command('ask',
 import os
 # os.environ['HTTP_PROXY'] = os.environ['HTTPS_PROXY'] = 'http://127.0.0.1:12949'
 # os.environ['HTTP_PROXY'] = os.environ['HTTPS_PROXY'] = 'http://127.0.0.1:7890'
-from gradio_client import Client, file
-try:
-    client = Client("xianbao/ChatGLM4")
-except:
-    client = None
+
+
+from .answerers import get_answerer
+answerer = get_answerer(config)
+
 import json, os
 history_file = 'history.json'
 if os.path.exists(history_file):
@@ -84,57 +87,50 @@ def get_system_prompt() -> str:
         return prompt
     except Exception as e:
         return f"错误：无法加载system prompt文本: {e}"
-
+    
+system_prompt = get_system_prompt()  # 从外部txt读取系统提示
 async def answer_question(question:str):
-    global client
-    if client is None:
-        try:
-            client = Client("xianbao/ChatGLM4")
-        except:
-            return "错误：网络无法连接后端！"
+#    config
+
+    global answerer
+    if not answerer.is_ok():
+        return "错误：网络无法连接后端！"
     global history
     if len(history)>10:
             history = history[-10:]
     print(history)
-    system_prompt = get_system_prompt()  # 从外部txt读取系统提示
-    result = client.predict(
-        #   query="who are you?",
-        # query="你是谁",
-        query=question,
-        history=history,
-        system=system_prompt,
+    
+    history = answerer.predict(question, history, system_prompt)
 
-        api_name="/model_chat"
-        )
-    history = result[1]
     with open(history_file, 'w') as f:
         json.dump(history, f, ensure_ascii=False, indent=4)
         
     answer = history[-1][1]
     return answer
 
+from nonebot.adapters.onebot.v11 import MessageSegment, Message, Bot
+
+
+async def answer_with_forward(answer:str, bot:Bot, threshold:int=100)->Message:
+    # 如果answer太长，使用QQ引用信息框包裹
+    if len(answer) > threshold:  # 可根据需要调整阈值
+        answer = MessageSegment.node_custom(2854196310, "DeepSeek-R1-Lite-Preview-智子", 
+                                            answer)
+        res_id = await bot.call_api("send_forward_msg", messages=Message(answer))
+        return Message(MessageSegment.forward(res_id))
+    else:
+        return Message(answer)
+
 @talker.handle()
 async def talk(args: Message = CommandArg(),
-                event: PrivateMessageEvent | GroupMessageEvent = None,):
+                event: PrivateMessageEvent | GroupMessageEvent = None,
+                bot: Bot = None):
     # 构造回复内容
     if question := args.extract_plain_text():
-        # await talker.finish(f"你问我{question}")
         answer = await answer_question(question)
-        # print(answer)
-        await talker.finish(answer)
-        
-        # answers = answer.split(r'\r?\n+')
-        
-        # answers = answer.splitlines()
-        # # answers = pattern.split(answer)
-        # for answer in answers:
-        #     if answer != "":
-        #         await talker.send(answer)
-        #         # sleep_time = 1
-        #         sleep_time = random.uniform(0, 2)
-        #         await asyncio.sleep(sleep_time)
-        # await talker.finish()
-        
+        print("answer:", answer)
+        message = await answer_with_forward(answer, bot)
+        await talker.finish(message)
     else:
         await talker.finish("在的，你要问我什么呀？")
 
@@ -220,5 +216,5 @@ async def h_r(bot: Bot, event: GroupIncreaseNoticeEvent, state: T_State):  # eve
         answer = await answer_question(welcome_prompt)
         await asyncio.sleep(random.uniform(0, 3))
         
-        await welcom.finish(message=Message(answer))  # 发送消息
+        await welcom.finish(await answer_with_forward(answer, bot))
 
