@@ -1,13 +1,14 @@
-# NoneBot2 QQ Starter 项目
+# NoneBot2 QQ 智子 项目
 
-该项目基于 [NoneBot2](https://v2.nonebot.dev/)，实现了一个多模型 AI 聊天机器人插件（Sophon），用于在 QQ 群和私聊中与用户进行交互。机器人支持接入 OpenRouter、Silicon Cloud、DMX 等多种 API，并提供问答历史存储、思考过程单独展现等功能。
+该项目基于 [NoneBot2](https://v2.nonebot.dev/)，实现了一个多模型 AI 聊天机器人插件——智子（Sophon），用于在 QQ 群和私聊中与用户进行交互。机器人支持接入 Huggingface Space Gradio、OpenRouter、Silicon Cloud、DMX 等多种 API平台，并提供上下文问答、思考过程单独展现等功能。
 
 ## 特性
 
 - 多模型切换支持（如 OpenRouter、Silicon Cloud、DMX）
 - 聊天记录存储与清除功能
+- 智子自我认知Prompt，并且支持深度思考。
 - 针对回答中的 `<think></think>` 标签进行深度思考内容的单独发送
-- 内置欢迎提示词和进群问答
+- 内置欢迎提示词和进群问答，当有新成员加入时，机器人会自动出题考察新成员。
 - 模型标识字符串自动归一化（如 `meta-llama/llama-3.1-70b-instruct:free` 简化为 `llama-3.1-70b-instruct`）
 
 ## 文件结构
