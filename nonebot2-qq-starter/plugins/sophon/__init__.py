@@ -84,6 +84,8 @@ def get_system_prompt() -> str:
             prompt = f.read()
             if "{date_str}" in prompt:
                 prompt = prompt.replace("{date_str}", date_str)
+            if "{ai_name}" in prompt:
+                prompt = prompt.replace("{ai_name}", "DeepSeek")
         return prompt
     except Exception as e:
         return f"错误：无法加载system prompt文本: {e}"
