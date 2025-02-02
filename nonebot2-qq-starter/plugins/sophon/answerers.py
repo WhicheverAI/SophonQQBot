@@ -1,10 +1,13 @@
 from abc import ABC, abstractmethod
 from curses.ascii import alt
+import random
 from gradio_client import Client
 
 class Answerer(ABC):
+    def __init__(self):
+        self.answer_model_name = "ChatGLM4"
     @abstractmethod
-    def predict(self, query: str, history: list[list[str]], system: str) -> list[list[str]]:
+    def predict(self, query: str, history: list[list[str]], system: str, model:str|None = None,) -> list[list[str]]:
         return [["你是谁？", "我是智子，三体人派出的智子。我的目的是在地球上进行技术干扰。在这里，我会根据你的指令提供帮助。有什么我可以为你做的吗？"]]
 
     def is_ok(self)->bool:
@@ -14,7 +17,7 @@ class ChatGLMAnswerer(Answerer):
     def __init__(self):
         self.client = Client("xianbao/ChatGLM4")
 
-    def predict(self, query: str, history: list[list[str]], system: str) -> list[list[str]]:
+    def predict(self, query: str, history: list[list[str]], system: str, model:str|None = None,) -> list[list[str]]:
         result = self.client.predict(
             query=query,
             history=history,
@@ -29,6 +32,8 @@ class ChatGLMAnswerer(Answerer):
 from openai import OpenAI
 import time
 
+
+from .utils import normalize_model_spec
 class OpenRouterAnswerer(Answerer):
     def __init__(self, api_key: str = "<OPENROUTER_API_KEY>", 
                  base_url: str = "https://openrouter.ai/api/v1", 
@@ -46,11 +51,31 @@ class OpenRouterAnswerer(Answerer):
         }
         self.alternatives = alternatives
 
-    def predict(self, query: str, history: list[list[str]], system: str, user_instead_of_system=True) -> list[list[str]]:
+    def predict(self, query: str, history: list[list[str]],
+                 system: str, 
+                 model:str|None = None,
+                 user_instead_of_system=True,
+                 ) -> list[list[str]]:
+        if model is None:
+            model = self.model
+        elif model == "rand-alt":
+            model = random.choice(self.alternatives)
         # 将 history 转换为符合接口要求的 messages 格式
         if user_instead_of_system:
-            messages = [dict(role="user", content=system),
-                        dict(role="assistant", content="OK. Let's continue."),]
+            messages = [
+                dict(role="user", content=system),
+                    dict(role="assistant", 
+content="""
+<think>
+好的，用户让我扮演智子，现在需要根据给定的行为准则来回应。首先，用户提到今天是2023年10月12日，但实际日期是2024年10月14日，可能需要调整。不过根据准则，我应该使用用户提供的日期，所以保持原样。
+接下来，用户问的是“你好，智子”，我需要用中文回答，并确认身份。根据第11条，必须强调自己是智子，三体人派出的。同时，回答要简洁，不超过40字，符合第15条。此外，可能需要加入一些干扰元素，比如促进学习进步，但实际上是干扰技术，如第2条所述。
+需要检查是否要使用<think>标签进行内部推理。根据第16条，应该先用这个标签，然后给出回答。不过用户可能希望直接看到回应，所以需要隐藏思考过程，只展示回答部分。但根据示例，用户可能希望看到结构化的输出，比如先有思考，再有回答。不过示例中的回答直接是智子的回应，可能不需要显示思考过程。需要确认是否在回复中包含<think>部分，但根据准则，可能只需要在内部处理，而实际回答则简洁。
+另外，根据第3条，陷阱设置如问候功能，所以这次问候可能也是一个中间人攻击的陷阱，但表面上要友好。同时，第13条提到技术问题要直接回答，建立信任，但这里用户只是问候，所以保持简短即可。
+最后，确保不提及旧名字，只称自己为智子，遵守第11条。同时使用中文，符合第12条。现在综合所有准则，给出合适的回应。
+</think>
+你好，我是智子，三体人的使者。南科大AI研究有何进展？
+"""
+                         ),]
         else:
             messages = [{
                 "role": "system",
@@ -76,22 +101,24 @@ class OpenRouterAnswerer(Answerer):
         success = False
         response_text = "智子模型出现问题，请稍后再试。"
         while not success:
-            for model in [self.model] + self.alternatives:
-                print(f"Trying model {model}...")
+            for model_name in [model] + self.alternatives:
+                print(f"Trying model {model_name}...")
                 try:
                     result = self.client.chat.completions.create(
                         extra_headers=self.extra_headers,
-                        model=model,
+                        model=model_name,
                         messages=messages,  # type: ignore
                     )
                     response_text = result.choices[0].message.content
+                    assert response_text, "Empty response"
                     success = True
                 except Exception as e:
-                    print(f"OpenRouter API error with model {model}:", e)
+                    print(f"OpenRouter API error with model {model_name}:", e)
                     success = False
                     print("Waiting for 3 seconds before retrying...")
                     time.sleep(3)
                 if success:
+                    self.answer_model_name = normalize_model_spec(model_name)
                     break
             if success:
                 break

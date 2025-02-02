@@ -91,37 +91,58 @@ def get_system_prompt(file_name="system_prompt.txt") -> str:
         return f"错误：无法加载system prompt文本: {e}"
     
 system_prompt = get_system_prompt()  # 从外部txt读取系统提示
-async def answer_question(question:str):
+history_len = 30
+# history_len = 10
+async def answer_question(question:str, model:str|None=None, change_history=True)->str:
 #    config
 
     global answerer
     if not answerer.is_ok():
         return "错误：网络无法连接后端！"
     global history
-    if len(history)>10:
-            history = history[-10:]
+    if len(history)>history_len:
+            history = history[-history_len:]
     print(history)
     
-    history = answerer.predict(question, history, system_prompt)
+    new_history = answerer.predict(question, history, system_prompt, model)
+    answer = new_history[-1][1]
 
-    with open(history_file, 'w') as f:
-        json.dump(history, f, ensure_ascii=False, indent=4)
-        
-    answer = history[-1][1]
+    if change_history:
+        history = new_history
+
+        with open(history_file, 'w') as f:
+            json.dump(history, f, ensure_ascii=False, indent=4)
+            
     return answer
 
 from nonebot.adapters.onebot.v11 import MessageSegment, Message, Bot
 
 
-async def answer_with_forward(answer:str, bot:Bot, threshold:int=100)->Message:
+async def answer_with_forward(answer:str, bot:Bot, threshold:int=100, nickname=None)->Message:
+    if nickname is None:
+        nickname = answerer.answer_model_name + "--智子"
     # 如果answer太长，使用QQ引用信息框包裹
     if len(answer) > threshold:  # 可根据需要调整阈值
-        answer = MessageSegment.node_custom(2854196310, "DeepSeek-R1-Lite-Preview-智子", 
+        answer = MessageSegment.node_custom(2854196310, nickname, 
                                             answer)
         res_id = await bot.call_api("send_forward_msg", messages=Message(answer))
         return Message(MessageSegment.forward(res_id))
     else:
         return Message(answer)
+
+# 新增函数：提取 <think></think> 内的内容并单独发送，同时返回处理后的answer
+import re
+async def send_think_segments(answer: str, bot: Bot, sender) -> str:
+    for think_name in ['think', '思考', 'thought']:
+        think_parts = re.findall(rf'<{think_name}>(.*?)</{think_name}>', answer, flags=re.DOTALL)
+        if think_parts:
+            for part in think_parts:
+                str_think = "深度思考：" + part.strip()
+                message = await answer_with_forward(str_think, bot)
+                await asyncio.sleep(random.uniform(0, 3))
+                await sender.send(message)
+            answer = re.sub(rf'<{think_name}>.*?</{think_name}>', '', answer, flags=re.DOTALL)
+    return answer.strip()
 
 @talker.handle()
 async def talk(args: Message = CommandArg(),
@@ -129,8 +150,21 @@ async def talk(args: Message = CommandArg(),
                 bot: Bot = None):
     # 构造回复内容
     if question := args.extract_plain_text():
+
+        # 抽奖对比一个随机模型
+        answer = await answer_question(question, model="rand-alt", change_history=False)
+        answer = await send_think_segments(answer, bot, talker)
+        answer = f"{answer} ({answerer.answer_model_name}--智子回答)"
+        message = await answer_with_forward(answer, bot)
+        await talker.send(message)
+
+        await asyncio.sleep(random.uniform(0, 1))   
+
+        # prefer的模型
         answer = await answer_question(question)
-        print("answer:", answer)
+        # 使用 send_think_segments 函数处理 <think></think> 逻辑
+        answer = await send_think_segments(answer, bot, talker)
+        answer = f"{answer} ({answerer.answer_model_name}--智子回答)"
         message = await answer_with_forward(answer, bot)
         await talker.finish(message)
     else:
@@ -216,6 +250,8 @@ async def h_r(bot: Bot, event: GroupIncreaseNoticeEvent, state: T_State):  # eve
         
         # await welcom.send(message=Message(f"智子正在出题中「{welcome_prompt}」"))  # 发送消息
         answer = await answer_question(welcome_prompt)
+        # 使用 send_think_segments 函数处理 <think></think> 逻辑
+        answer = await send_think_segments(answer, bot, welcom)
         await asyncio.sleep(random.uniform(0, 3))
         
         await welcom.finish(await answer_with_forward(answer, bot))
