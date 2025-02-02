@@ -136,20 +136,28 @@ def get_answerer(config:SophonConfig) -> Answerer:
     if config.model_type == "gradio":
         return ChatGLMAnswerer()
     elif config.model_type == "openai":
-        return OpenAIAnswerer(
-            api_key=config.openrouter_api_key,
-            base_url=config.openrouter_base_url,
-            model=config.model,
-            site_url=config.openrouter_site_url,
-            site_name=config.openrouter_site_name, 
-            alternatives=config.alternatives
-        )
-    elif config.model_type == "openai_silicon_cloud":
-        return OpenAIAnswerer(
-            api_key=config.silicon_cloud_api_key,
-            base_url=config.silicon_cloud_base_url,
-            model=config.silicon_cloud,
-            alternatives=config.silicon_clouds
-        )
+        if config.openai_type == "openrouter":
+            return OpenAIAnswerer(
+                api_key=config.openrouter_api_key,
+                base_url=config.openrouter_base_url,
+                model=config.openrouter_model,
+                site_url=config.openrouter_site_url,
+                site_name=config.openrouter_site_name, 
+                alternatives=config.openrouter_alternatives
+            )
+        elif config.openai_type == "silicon_cloud":
+            return OpenAIAnswerer(
+                api_key=config.silicon_cloud_api_key,
+                base_url=config.silicon_cloud_base_url,
+                model=config.silicon_cloud,
+                alternatives=config.silicon_clouds
+            )
+        elif config.openai_type == "dmx":
+            return OpenAIAnswerer(
+                api_key=config.dmx_api_key,
+                base_url=config.dmx_base_url,
+                model=config.dmx,
+                alternatives=config.dmxs
+                )
     else:
         raise ValueError(f"Unsupported model: {config.sophon_model}")

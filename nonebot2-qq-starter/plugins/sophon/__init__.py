@@ -101,10 +101,13 @@ async def answer_question(question:str, model:str|None=None, change_history=True
         return "错误：网络无法连接后端！"
     global history
     if len(history)>history_len:
-            history = history[-history_len:]
-    print(history)
+        # history = history[-history_len:]
+        input_history = history[-history_len:]
+    else:
+        input_history = history
+    print(input_history)
     
-    new_history = answerer.predict(question, history, system_prompt, model)
+    new_history = answerer.predict(question, input_history, system_prompt, model)
     answer = new_history[-1][1]
 
     if change_history:
