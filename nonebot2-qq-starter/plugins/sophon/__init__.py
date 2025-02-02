@@ -78,14 +78,14 @@ date_str = now.strftime('%Y-%m-%d')
 print(date_str)  # 输出类似于 '2024-06-24'
 
 # 新增辅助函数，从 system_prompt.txt 读取长 system prompt
-def get_system_prompt() -> str:
+def get_system_prompt(file_name="system_prompt.txt") -> str:
     try:
-        with open("system_prompt.txt", "r", encoding="utf8") as f:
+        with open(file_name, "r", encoding="utf8") as f:
             prompt = f.read()
             if "{date_str}" in prompt:
                 prompt = prompt.replace("{date_str}", date_str)
             if "{ai_name}" in prompt:
-                prompt = prompt.replace("{ai_name}", "DeepSeek")
+                prompt = prompt.replace("{ai_name}", "DeepSeek-R1")
         return prompt
     except Exception as e:
         return f"错误：无法加载system prompt文本: {e}"
