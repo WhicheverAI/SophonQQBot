@@ -8,4 +8,5 @@ def normalize_model_spec(spec: str) -> str:
 # 示例用法
 if __name__ == "__main__":
     test_str = "meta-llama/llama-3.1-70b-instruct:free"
+    test_str = "Qwen/Qwen2.5-Coder-7B-Instruct"
     print(normalize_model_spec(test_str))

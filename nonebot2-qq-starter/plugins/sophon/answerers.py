@@ -34,16 +34,17 @@ import time
 
 
 from .utils import normalize_model_spec
-class OpenRouterAnswerer(Answerer):
+class OpenAIAnswerer(Answerer):
     def __init__(self, api_key: str = "<OPENROUTER_API_KEY>", 
                  base_url: str = "https://openrouter.ai/api/v1", 
                  model: str="deepseek/deepseek-r1:free", 
-                 site_url: str = "<YOUR_SITE_URL>", site_name: str = "<YOUR_SITE_NAME>", 
+                 site_url: str = "https://github.com/WhicheverAI", site_name: str = "SophonAI", 
                  alternatives: list[str] = []):
         self.client = OpenAI(
             base_url=base_url,
             api_key=api_key,
         )
+        self.base_url = base_url
         self.model = model
         self.extra_headers = {
             "HTTP-Referer": site_url,
@@ -113,7 +114,7 @@ content="""
                     assert response_text, "Empty response"
                     success = True
                 except Exception as e:
-                    print(f"OpenRouter API error with model {model_name}:", e)
+                    print(f"OpenAI API {self.base_url} error with model {model_name}:", e)
                     success = False
                     print("Waiting for 3 seconds before retrying...")
                     time.sleep(3)
@@ -135,13 +136,20 @@ def get_answerer(config:SophonConfig) -> Answerer:
     if config.model_type == "gradio":
         return ChatGLMAnswerer()
     elif config.model_type == "openai":
-        return OpenRouterAnswerer(
+        return OpenAIAnswerer(
             api_key=config.openrouter_api_key,
             base_url=config.openrouter_base_url,
             model=config.model,
             site_url=config.openrouter_site_url,
             site_name=config.openrouter_site_name, 
             alternatives=config.alternatives
+        )
+    elif config.model_type == "openai_silicon_cloud":
+        return OpenAIAnswerer(
+            api_key=config.silicon_cloud_api_key,
+            base_url=config.silicon_cloud_base_url,
+            model=config.silicon_cloud,
+            alternatives=config.silicon_clouds
         )
     else:
         raise ValueError(f"Unsupported model: {config.sophon_model}")
