@@ -144,6 +144,109 @@ class OpenAIAnswerer(Answerer):
         # 将当前问答对追加到 history 中返回
         new_history = history + [[query, response_text]]
         return new_history
+    
+class MetaAnswerer(Answerer):
+    """Meta Answerer that manages multiple answerers with timeout control"""
+    
+    def __init__(
+        self,
+        primary_answerer: Answerer,
+        backup_answerers: List[Answerer],
+        request_timeout: float = 30.0,
+        total_timeout: float = 90.0,
+        retry_delay: float = 3.0
+    ):
+        super().__init__()
+        self.primary = primary_answerer
+        self.backups = backup_answerers
+        self.request_timeout = request_timeout
+        self.total_timeout = total_timeout
+        self.retry_delay = retry_delay
+        self._executor = ThreadPoolExecutor(max_workers=1)
+
+    async def _predict_with_timeout(
+        self,
+        answerer: Answerer,
+        query: str,
+        history: list[list[str]],
+        system: str,
+        model: str | None = None,
+    ) -> Optional[list[list[str]]]:
+        """尝试使用指定的answerer预测，带超时控制"""
+        try:
+            # 将同步predict方法包装在线程池中运行
+            loop = asyncio.get_event_loop()
+            future = loop.run_in_executor(
+                self._executor,
+                answerer.predict,
+                query,
+                history,
+                system,
+                model
+            )
+            
+            # 等待结果，带超时
+            result = await asyncio.wait_for(future, timeout=self.request_timeout)
+            return result
+        except (asyncio.TimeoutError, Exception) as e:
+            print(f"Answerer failed: {e}")
+            return None
+
+    def predict(
+        self,
+        query: str,
+        history: list[list[str]],
+        system: str,
+        model: str | None = None,
+    ) -> list[list[str]]:
+        """使用多个answerer尝试回答，带超时和重试机制"""
+        start_time = time.time()
+        error_msg = "所有模型都失败了，请稍后再试。"
+
+        # 创建异步事件循环
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        while time.time() - start_time < self.total_timeout:
+            # 首先尝试主要的answerer
+            try:
+                result = loop.run_until_complete(
+                    self._predict_with_timeout(
+                        self.primary, query, history, system, model
+                    )
+                )
+                if result:
+                    self.answer_model_name = self.primary.answer_model_name
+                    loop.close()
+                    return result
+            except Exception as e:
+                print(f"Primary answerer failed: {e}")
+
+            # 如果主要answerer失败，尝试备用answerers
+            for backup in self.backups:
+                try:
+                    result = loop.run_until_complete(
+                        self._predict_with_timeout(
+                            backup, query, history, system, model
+                        )
+                    )
+                    if result:
+                        self.answer_model_name = backup.answer_model_name
+                        loop.close()
+                        return result
+                except Exception as e:
+                    print(f"Backup answerer failed: {e}")
+
+            # 所有answerer都失败了，等待一段时间后重试
+            time.sleep(self.retry_delay)
+
+        loop.close()
+        # 如果所有尝试都失败，返回带有错误消息的结果
+        return history + [[query, error_msg]]
+
+    def is_ok(self) -> bool:
+        """检查是否至少有一个可用的answerer"""
+        return self.primary.is_ok() or any(b.is_ok() for b in self.backups)
 
 from .config import SophonConfig
 
@@ -183,11 +286,22 @@ def _create_openai_answerer(config: SophonConfig) -> OpenAIAnswerer:
     else:
         raise ValueError(f"Unknown OpenAI type: {config.openai_type}")
 
-def get_answerer(config: SophonConfig) -> Answerer:
+def get_answerer(config: SophonConfig, overrides:dict={}) -> Answerer:
+    config = config.copy(update=overrides)
     if config.model_type == "gradio":
         return ChatGLMAnswerer()
     elif config.model_type == "openai":
         return _create_openai_answerer(config)
+    elif config.model_type == "meta":
+        primary_answerer = get_answerer(config, config.primary_answerer)
+        backup_answerers = [get_answerer(config, b) for b in config.backup_answerers]
+        return MetaAnswerer(
+            primary_answerer=primary_answerer,
+            backup_answerers=backup_answerers,
+            request_timeout=config.request_timeout,
+            total_timeout=config.total_timeout,
+            retry_delay=config.retry_delay,
+        )
     else:
         raise ValueError(f"Unsupported model provider: {config.model_type}")
     
