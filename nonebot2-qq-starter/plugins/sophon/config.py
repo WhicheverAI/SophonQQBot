@@ -4,12 +4,15 @@ class SophonConfig(BaseModel, extra=Extra.ignore):
     # 模型选择 (chatglm/deepseek)
     # sophon_model: str = "gradio"  
     model_type: str = "openai"  
-    openai_type: str = "silicon_cloud"  # openrouter/silicon_cloud/dmx
+    # openai_type: str = "silicon_cloud"  # openrouter/silicon_cloud/dmx/baidu
+    # openai_type: str = "baidu"  # openrouter/silicon_cloud/dmx/baidu
+    openai_type: str = "openrouter"  # openrouter/silicon_cloud/dmx/baidu
     # openai_type: str = "dmx"  # openrouter/silicon_cloud/dmx
     # model: str = "meta-llama/llama-3.1-405b-instruct:free"
     openrouter_model: str = "deepseek/deepseek-r1:free"
     # model:str = "google/gemini-2.0-flash-thinking-exp:free"
-    openrouter_alternatives: list[str] = [
+    openrouter_choices: list[str] = [
+        # "deepseek/deepseek-r1:free",
         # "microsoft/phi-3-medium-128k-instruct:free",
         "meta-llama/llama-3.1-405b-instruct:free",
         "meta-llama/llama-3.1-70b-instruct:free",
@@ -37,11 +40,15 @@ class SophonConfig(BaseModel, extra=Extra.ignore):
     silicon_cloud_base_url="https://api.siliconflow.cn/v1"
 
     # silicon_cloud:str = "AIDC-AI/Marco-o1"
-    # silicon_cloud:str = "deepseek-ai/DeepSeek-R1" # 收费
+    # silicon_cloud:str = "deepseek-ai/DeepSeek-R1" # 收费; 卡死了
+    # silicon_cloud:str = "Qwen/QVQ-72B-Preview" # 收费; 
     silicon_cloud:str = "deepseek-ai/DeepSeek-V3" # 收费
     silicon_clouds: list[str] = [
         "Qwen/Qwen2.5-7B-Instruct",
         "Qwen/Qwen2.5-Coder-7B-Instruct",
+        "deepseek-ai/DeepSeek-R1-Distill-Llama-8B",
+        "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+        "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
         "internlm/internlm2_5-7b-chat",
         "meta-llama/Meta-Llama-3.1-8B-Instruct",
         "Qwen/Qwen2-7B-Instruct",
@@ -71,3 +78,20 @@ class SophonConfig(BaseModel, extra=Extra.ignore):
         # "kyw",
         # "lite",
     ]
+
+    baidu_api_key: str = ""
+    baidu_base_url: str = "https://qianfan.baidubce.com/v2"
+    baidu:str = "deepseek-r1"
+    baidus: list[str] = [
+        "deepseek-v3",
+        "ernie-lite-8k",
+        "ernie-tiny-8k",
+        "ernie-speed-128k",
+    ]
+
+    baidu_appid: str = ""
+
+    # Meta Answerer配置
+    request_timeout: float = 30.0  # 单个请求超时时间（秒）
+    total_timeout: float = 90.0  # 总尝试时间超时（秒）
+    retry_delay: float = 3.0  # 重试延迟时间（秒）
