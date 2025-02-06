@@ -91,8 +91,9 @@ def get_system_prompt(file_name="system_prompt.txt") -> str:
         return f"错误：无法加载system prompt文本: {e}"
     
 system_prompt = get_system_prompt()  # 从外部txt读取系统提示
-history_len = 30
+# history_len = 30
 # history_len = 10
+history_len = 15
 async def answer_question(question:str, model:str|None=None, change_history=True)->str:
 #    config
 
