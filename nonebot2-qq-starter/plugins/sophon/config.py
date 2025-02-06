@@ -6,9 +6,9 @@ class SophonConfig(BaseModel, extra=Extra.ignore):
     model_type: str = "openai"
     # model_type: str = "meta"
 
-    # openai_type: str = "silicon_cloud"  # openrouter/silicon_cloud/dmx/baidu
+    openai_type: str = "silicon_cloud"  # openrouter/silicon_cloud/dmx/baidu
     # openai_type: str = "baidu"  # openrouter/silicon_cloud/dmx/baidu
-    openai_type: str = "openrouter"  # openrouter/silicon_cloud/dmx/baidu
+    # openai_type: str = "openrouter"  # openrouter/silicon_cloud/dmx/baidu
     # openai_type: str = "dmx"  # openrouter/silicon_cloud/dmx
     # model: str = "meta-llama/llama-3.1-405b-instruct:free"
     openrouter_model: str = "deepseek/deepseek-r1:free"
